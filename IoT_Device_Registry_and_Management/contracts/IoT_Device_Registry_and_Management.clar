@@ -98,4 +98,67 @@
   )
 )
 
+;; Advanced Device Data Verification
+(define-public (verify-device-data
+  (device-id (buff 32))
+  (verification-score uint)
+  (data-hash (buff 32))
+)
+  (let 
+    (
+      (verification (unwrap! 
+        (map-get? device-verifications { device-id: device-id }) 
+        ERR-DEVICE-NOT-FOUND
+      ))
+      (device (unwrap! 
+        (map-get? devices { device-id: device-id }) 
+        ERR-DEVICE-NOT-FOUND
+      ))
+    )
+    
+    ;; Advanced verification logic
+    (asserts! (> verification-score u0) ERR-UNAUTHORIZED)
+    
+    (map-set device-verifications
+      { device-id: device-id }
+      {
+        verification-count: (+ (get verification-count verification) u1),
+        total-verification-score: (+ (get total-verification-score verification) verification-score),
+        last-verified-timestamp: stacks-block-height
+      }
+    )
+    
+    ;; Reward verification with tokens
+    (try! (ft-mint? device-token verification-score tx-sender))
+    
+    (ok true)
+  )
+)
+
+;; Device Access Control
+(define-public (grant-device-access
+  (device-id (buff 32))
+  (authorized-user principal)
+  (access-level (string-ascii 20))
+  (duration uint)
+)
+  (let 
+    (
+      (device (unwrap! (map-get? devices { device-id: device-id }) ERR-DEVICE-NOT-FOUND))
+    )
+    
+    (asserts! (is-eq tx-sender (get owner device)) ERR-UNAUTHORIZED)
+    
+    (map-set device-access-control
+      { device-id: device-id, authorized-user: authorized-user }
+      {
+        access-level: access-level,
+        expiration-block: (+ stacks-block-height duration)
+      }
+    )
+    
+    (ok true)
+  )
+)
+
 
